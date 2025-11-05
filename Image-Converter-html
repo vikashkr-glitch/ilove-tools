@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Image Converter — Multi Tool Hub</title>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b0f13;
+      --panel:#0f1720;
+      --muted:#98a0ab;
+      --accent:#7c5cff;
+      --glass: rgba(255,255,255,0.03);
+      --danger:#ff6b6b;
+      --radius:12px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;min-height:100vh;background:linear-gradient(180deg,#05060a 0%,var(--bg) 100%);color:#e6eef8;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;
+      display:flex;align-items:center;justify-content:center;padding:28px;
+    }
+
+    .card{
+      width:min(980px,100%);
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03);
+      border-radius:16px;padding:20px;display:grid;grid-template-columns:420px 1fr;gap:20px;box-shadow:0 6px 30px rgba(0,0,0,0.6);
+    }
+
+    header{grid-column:1/-1;display:flex;align-items:center;gap:12px}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#00c2ff);display:flex;align-items:center;justify-content:center;font-weight:700}
+    h1{font-size:18px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .left{
+      background:var(--panel);padding:16px;border-radius:12px;display:flex;flex-direction:column;gap:12px;min-height:320px;align-items:stretch
+    }
+
+    .dropzone{
+      border:2px dashed rgba(255,255,255,0.04);padding:18px;border-radius:10px;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;background:var(--glass);
+    }
+    .dropzone img{max-width:100%;max-height:220px;border-radius:8px;object-fit:contain}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    input[type=file]{display:none}
+    .btn{background:linear-gradient(90deg,var(--accent),#3aa6ff);border:none;color:white;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.secondary{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+    .format-list{display:flex;flex-wrap:wrap;gap:8px}
+    .format-item{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:8px;cursor:pointer}
+    .format-item.active{background:rgba(124,92,255,0.12);border-color:rgba(124,92,255,0.3);color:var(--accent)}
+
+    .right{padding:16px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent);display:flex;flex-direction:column;gap:12px}
+    .preview-wrap{display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;padding:18px;border-radius:10px;border:1px solid rgba(255,255,255,0.03);min-height:320px;background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005))}
+    .preview-wrap img{max-width:100%;max-height:520px;border-radius:8px;object-fit:contain}
+
+    .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
+    .status{padding:8px 12px;border-radius:999px;background:rgba(255,255,255,0.02);font-weight:600}
+
+    .download-row{display:flex;gap:8px;align-items:center}
+    .note{font-size:12px;color:var(--muted)}
+
+    footer{grid-column:1/-1;color:var(--muted);font-size:12px;padding-top:6px}
+
+    @media (max-width:880px){
+      .card{grid-template-columns:1fr;}
+      .left{order:1}
+      .right{order:2}
+    }
+  </style>
+</head>
+<body>
+  <div class="card" role="application">
+    <header>
+      <div class="logo">MH</div>
+      <div>
+        <h1>Image Converter — Multi Tool Hub</h1>
+        <p class="lead">Upload an image, choose an output format, preview, and download — all in a clean dark UI.</p>
+      </div>
+    </header>
+
+    <section class="left">
+      <div class="dropzone" id="dropzone">
+        <div style="text-align:center;max-width:100%">
+          <strong id="filename">No file selected</strong>
+          <div class="note" id="filesub">Supported: PNG, JPG, JPEG, BMP, GIF, TIFF, WEBP — Max 10 MB</div>
+        </div>
+
+        <img id="thumb" src="" alt="preview" style="display:none">
+
+        <div class="controls">
+          <label class="btn" for="fileInput">Choose Image</label>
+          <input id="fileInput" type="file" accept="image/*" />
+          <button class="btn secondary" id="clearBtn">Clear</button>
+        </div>
+
+        <div style="width:100%;display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px">
+          <div class="note">Tip: Drag & drop an image here</div>
+          <div id="sizeInfo" class="note"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+        <div class="note">Choose output format</div>
+        <div class="format-list" id="formats">
+          <!-- buttons injected by JS -->
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button class="btn" id="convertBtn">Convert</button>
+          <button class="btn secondary" id="downloadBtn" disabled>Download</button>
+        </div>
+
+        <div id="processing" class="note" style="display:none;margin-top:6px">Processing image...</div>
+        <div id="error" style="color:var(--danger);display:none;font-weight:600"></div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="meta"><div>Output preview</div><div class="status" id="outFormat">—</div></div>
+
+      <div class="preview-wrap" id="previewWrap">
+        <div class="note">Converted preview will appear here</div>
+        <img id="outImg" style="display:none" alt="converted preview"/>
+        <canvas id="workCanvas" style="display:none"></canvas>
+      </div>
+
+      <div class="download-row">
+        <div class="note">Ready to download?</div>
+        <div style="margin-left:auto">
+          <button class="btn secondary" id="openTab" style="display:none">Open in new tab</button>
+        </div>
+      </div>
+
+      <div class="note">Supported output: PNG, JPG, JPEG, PDF, BMP, GIF (single-frame), WEBP, TIFF (browser support may vary).</div>
+    </section>
+
+    <footer>
+      Note: Animated GIFs will be converted as their first frame. TIFF and BMP export depend on browser support for these MIME types — if a format is unsupported, the tool will fall back to PNG and notify you.
+    </footer>
+  </div>
+
+  <script>
+    // Configuration
+    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+    const inputFormats = ['png','jpg','jpeg','bmp','gif','tiff','webp'];
+    const outputFormats = ['PNG','JPG','JPEG','PDF','BMP','GIF','WEBP','TIFF'];
+
+    // UI refs
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const thumb = document.getElementById('thumb');
+    const filenameEl = document.getElementById('filename');
+    const sizeInfo = document.getElementById('sizeInfo');
+    const formatsWrap = document.getElementById('formats');
+    const convertBtn = document.getElementById('convertBtn');
+    const processing = document.getElementById('processing');
+    const errorEl = document.getElementById('error');
+    const outFormatEl = document.getElementById('outFormat');
+    const outImg = document.getElementById('outImg');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const openTabBtn = document.getElementById('openTab');
+    const clearBtn = document.getElementById('clearBtn');
+    const workCanvas = document.getElementById('workCanvas');
+
+    let currentFile = null;
+    let selectedFormat = 'PNG';
+    let outputBlob = null;
+
+    // Build format buttons
+    function makeFormats(){
+      outputFormats.forEach(f=>{
+        const b = document.createElement('button');
+        b.className = 'format-item' + (f===selectedFormat? ' active':'');
+        b.textContent = f;
+        b.addEventListener('click', ()=>{
+          selectedFormat = f;
+          document.querySelectorAll('.format-item').forEach(x=>x.classList.remove('active'));
+          b.classList.add('active');
+          outFormatEl.textContent = f;
+        });
+        formatsWrap.appendChild(b);
+      });
+      outFormatEl.textContent = selectedFormat;
+    }
+    makeFormats();
+
+    // Helpers
+    function showError(msg){ errorEl.style.display='block'; errorEl.textContent = msg; }
+    function clearError(){ errorEl.style.display='none'; errorEl.textContent=''; }
+
+    function formatBytes(bytes){ if(bytes<1024) return bytes+' B'; if(bytes<1024*1024) return (bytes/1024).toFixed(1)+' KB'; return (bytes/(1024*1024)).toFixed(2)+' MB'; }
+
+    // File handling
+    fileInput.addEventListener('change', e=>{
+      const f = e.target.files[0];
+      handleFile(f);
+    });
+
+    function handleFile(file){
+      clearError();
+      if(!file) return;
+      if(file.size>MAX_SIZE) return showError('File is too large. Max 10 MB.');
+      const ext = (file.name.split('.').pop()||'').toLowerCase();
+      if(!inputFormats.includes(ext)) return showError('Unsupported file type.');
+
+      currentFile = file;
+      filenameEl.textContent = file.name;
+      sizeInfo.textContent = formatBytes(file.size);
+
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        thumb.src = reader.result; thumb.style.display='block';
+      }
+      reader.readAsDataURL(file);
+
+      // reset output
+      outImg.style.display='none'; outputBlob = null; downloadBtn.disabled=true; openTabBtn.style.display='none';
+    }
+
+    // Drag & drop
+    ['dragenter','dragover'].forEach(ev=> dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.style.borderColor='rgba(124,92,255,0.5)'; }) );
+    ['dragleave','drop'].forEach(ev=> dropzone.addEventListener(ev, e=>{ e.preventDefault(); dropzone.style.borderColor='rgba(255,255,255,0.04)'; }) );
+    dropzone.addEventListener('drop', e=>{ const f = e.dataTransfer.files[0]; handleFile(f); });
+
+    clearBtn.addEventListener('click', ()=>{
+      currentFile=null; filenameEl.textContent='No file selected'; thumb.src=''; thumb.style.display='none'; sizeInfo.textContent=''; outImg.style.display='none'; outputBlob=null; downloadBtn.disabled=true; openTabBtn.style.display='none'; clearError();
+    });
+
+    // Conversion
+    convertBtn.addEventListener('click', async ()=>{
+      clearError();
+      if(!currentFile) return showError('Please select an image first.');
+      processing.style.display='block';
+      processing.textContent = 'Processing image...';
+      convertBtn.disabled=true;
+
+      try{
+        const dataUrl = await fileToDataURL(currentFile);
+        const img = await loadImage(dataUrl);
+
+        // canvas draw
+        const maxDim = 4000; // prevent absurd large canvases
+        let w = img.width, h = img.height;
+        if(w>maxDim || h>maxDim){
+          const ratio = Math.min(maxDim/w, maxDim/h);
+          w = Math.round(w*ratio); h = Math.round(h*ratio);
+        }
+        workCanvas.width = w; workCanvas.height = h;
+        const ctx = workCanvas.getContext('2d');
+        ctx.clearRect(0,0,w,h);
+        ctx.drawImage(img,0,0,w,h);
+
+        // Decide output
+        const fmt = selectedFormat.toUpperCase();
+        if(fmt==='PDF'){
+          // use jsPDF to embed image in PDF
+          const { jsPDF } = window.jspdf;
+          const pdf = new jsPDF({ unit:'px', format:[w,h] });
+          // toDataURL with JPEG for smaller size
+          const imgData = workCanvas.toDataURL('image/jpeg', 0.92);
+          pdf.addImage(imgData,'JPEG',0,0,w,h);
+          const blob = pdf.output('blob');
+          finish(blob, 'converted.pdf');
+        } else {
+          // Map format to mime
+          const mimeMap = { 'PNG':'image/png', 'JPG':'image/jpeg', 'JPEG':'image/jpeg', 'BMP':'image/bmp', 'GIF':'image/gif', 'WEBP':'image/webp', 'TIFF':'image/tiff' };
+          let mime = mimeMap[fmt] || 'image/png';
+
+          // Many browsers only support PNG/JPEG/WEBP from canvas. We'll try, and fallback to PNG if blob is empty or unsupported.
+          let blob = await new Promise(resolve=> workCanvas.toBlob(resolve, mime, 0.92));
+
+          if(!blob){
+            // fallback
+            const fallback = await new Promise(resolve=> workCanvas.toBlob(resolve, 'image/png'));
+            showError('Selected output not supported by your browser — falling back to PNG.');
+            mime = 'image/png';
+            blob = fallback;
+          }
+
+          // If user asked for JPG but original had alpha, provide white background
+          if((fmt==='JPG' || fmt==='JPEG') && needsWhiteBackground(img)){
+            const tmp = document.createElement('canvas'); tmp.width=w; tmp.height=h; const tctx = tmp.getContext('2d');
+            tctx.fillStyle='#ffffff'; tctx.fillRect(0,0,w,h); tctx.drawImage(img,0,0,w,h);
+            blob = await new Promise(resolve=> tmp.toBlob(resolve, 'image/jpeg', 0.92));
+          }
+
+          finish(blob, `converted.${fmt.toLowerCase()}`);
+        }
+
+      }catch(err){
+        console.error(err);
+        showError('Conversion failed: ' + (err.message || err));
+      }finally{
+        processing.style.display='none'; convertBtn.disabled=false;
+      }
+    });
+
+    function finish(blob, filename){
+      outputBlob = blob;
+      const url = URL.createObjectURL(blob);
+      outImg.src = url; outImg.style.display='block'; downloadBtn.disabled=false; openTabBtn.style.display='inline-block';
+      downloadBtn.onclick = ()=> downloadBlob(blob, filename);
+      openTabBtn.onclick = ()=> window.open(url, '_blank');
+    }
+
+    // Utilities
+    function fileToDataURL(file){
+      return new Promise((res,rej)=>{
+        const r = new FileReader(); r.onload = ()=>res(r.result); r.onerror = rej; r.readAsDataURL(file);
+      });
+    }
+    function loadImage(src){
+      return new Promise((res,rej)=>{
+        const i = new Image();
+        i.onload = ()=>res(i); i.onerror = rej; i.src = src;
+        // to avoid cross-origin tainting when file is local, set this after src sometimes; local files won't set crossorigin
+      });
+    }
+
+    function downloadBlob(blob, filename){
+      const a = document.createElement('a'); const url = URL.createObjectURL(blob);
+      a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000*30);
+    }
+
+    function needsWhiteBackground(img){
+      // crude check: if image has alpha channel by drawing small area and checking alpha
+      try{
+        const c = document.createElement('canvas'); c.width=1;c.height=1; const g=c.getContext('2d'); g.drawImage(img,0,0,1,1);
+        const d=g.getImageData(0,0,1,1).data; return d[3]!==255;
+      }catch(e){return false}
+    }
+
+    // initial UX
+    // Warn user if file API size limit
+    document.addEventListener('paste', e=>{
+      const items = e.clipboardData.files || [];
+      if(items.length) handleFile(items[0]);
+    });
+
+    // Accessibility: allow keyboard choose
+    document.addEventListener('keydown', e=>{
+      if(e.key==='Enter' && document.activeElement===convertBtn) convertBtn.click();
+    });
+
+    // End of script
+  </script>
+</body>
+</html>
